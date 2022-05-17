@@ -23,3 +23,12 @@ flag set in routing table entries.
 End result: server's default network connection uses fast fibre optic
 connection, but all email notifications use slower cable connection.
 
+
+Format for optional file ./extraDomains where more email destination domains:
+
+* One domain per line
+* Comments use `#` character
+
+If such a file exists, and is readable, the main script will parse it and
+add the domains found to the master list prior to `dig`-ing the MX records.
+
