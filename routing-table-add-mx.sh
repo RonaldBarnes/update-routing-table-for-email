@@ -23,6 +23,7 @@
 ## not given, ip assumes protocol boot (i.e. it assumes the
 ## route was added by someone who doesn't understand what
 ## they are doing).
+##
 ## (Harsh, but fair. rb / rgb / uid1)
 prefMailRoute='10.60.42.1 dev eno2'
 prefMailRoute='10.60.42.1 dev eno2 proto static'
@@ -79,23 +80,65 @@ printf ' > \"%s\"\n' "${table[@]}"
 
 
 ## Major email provider domains to create specific routes for:
-mxDomains=('ronaldbarnes.ca'
-	'maow.net'
+mxDomains=(
 	'gmail.com'
 	'telus.net'
 	'yahoo.com'
 	'shaw.ca'
-	'kwvoip.ca'
-	## Generate a known duplicate of kwvoip.ca:
+	## Generate a known duplicate of if 2 domains MX records point to same IP:
 	## INTERESTING: the routing table gets read once,
 	## so duplicates can be added within the loops
 	## below (until I fix it)
-	'bclug.ca'
+	## Fixed it by repeating load_current_routing_table()
 	);
+
+
+
+## Allow extra domains to be routed by placing them in file ./extraDomains
+## Check ./extraDomains exists and is readable
+## File contents should consist of one domain name per line
+## Comments in ./extraDomains indictated by # characters
+if [ -r ./extraDomains ] ; then
+	echo "Found readable file ./extraDomains: parsing..."
+	while read domain
+		## NOTE: regular expressions in bash are, frankly, stupidly implemented.
+		## Simply unable to get this working, and I am quite familiar with regex
+		## everywhere else.  Do not bother, use grep instead.
+		## Merely having the regexPattern defined caused infinite loop, even
+		## when not used elsewhere in script.
+		##
+		## regex pattern to match comments where # is comment, strip whitespace:
+		## regexPattern='^[ \t]*(#.*)'
+		do
+			## [[ ! ${domain} =~ '#' ]] &&
+			##	(
+			##	echo "Adding \"${domain}\" to list..."
+			##	)
+			##
+			## Add array element to mxDomains indexed array:
+			mxDomains+=(${domain});
+
+		## NOTE: redirection MUST be on same line as "done", else reads from
+		## keyboard... Weird.
+		## NOTE: One might expect to redirect from $(command), like below with
+		## dig | awk... but NO, that is a for loop, this is a while read.
+		## This syntax is a redirect from a sub-process:
+		done < <(
+			cat extraDomains				|
+				sed -e "s/#.*$//g"		|
+				sed -e "s/^[ \t]*//g"	|
+				awk '!/^$/'
+			)
+fi
+
+
+
+
 ## IFS=$'\n'
 echo "mxDomains, who get routing table entries:"
 printf ' > %s\n' "${mxDomains[@]}"
 ## IFS=${oldIFS}
+
 
 ## get mail servers from DNS MX records for some known domains and
 ## strip off the priority using awk:
@@ -120,7 +163,8 @@ for mxHost in $(dig +short -t mx ${mxDomains[@]} |awk '{print $2}');
 			echo " >ip route add ${mxHostIP} via ${prefMailRoute} table ${routingTable} ${priority}";
 			## add specific route through TekSavvy cable modem:
 # SKIPPING FOR NOW:
-			ip route add ${mxHostIP} via ${prefMailRoute} table ${routingTable} ${priority}
+#			ip route add ${mxHostIP} via ${prefMailRoute} table ${routingTable} ${priority}
+echo "SKIPPING TABLE UPDATE: UNDO FOR PRODUCTION"
 		fi
 		done;
 	## IFS=${oldIFS}
